@@ -23,14 +23,15 @@ fit_usa <- stan(
 )
 
 # multiple regression on year and country
-plot(gdp$Year, gdp$GDP)
+gdp_nomiss <- tidyr::drop_na(gdp)
+plot(gdp_nomiss$Year, gdp_nomiss$GDP)
 
-X <- model.matrix(~factor(gdp$Country.Code) + gdp$Year)
+X <- model.matrix(~factor(gdp_nomiss$Country.Code) + gdp_nomiss$Year)
 
 gdp_data <- list(
-    N = nrow(gdp),
+    N = nrow(gdp_nomiss),
     K = ncol(X),
-    y = gdp$GDP,
+    y = gdp_nomiss$GDP,
     X = X
 )
 
@@ -43,8 +44,27 @@ fit_gdp <- stan(
     cores = 4
 )
 
-
-
-
 # Bayesian missing data handling 
+# 'DEU' is missing some GDP values near 1960
+X <- model.matrix(~factor(gdp$Country.Code) * gdp$Year)
+which_mis <- which(is.na(gdp$GDP))
 
+gdp_mis_data <- list(
+    N_obs = sum(!is.na(gdp$GDP)),
+    N_mis = sum(is.na(gdp$GDP)),
+    K = ncol(X),
+    y_obs = gdp$GDP[-which_mis],
+    X_obs = X[-which_mis, ],
+    X_mis = X[which_mis, ]
+)
+
+fit_gdp_mis <- stan(
+    file = 'stan/gdp_lm_mis.stan',
+    data = gdp_mis_data,
+    chains = 4,
+    warmup = 1000,
+    iter = 2000,
+    cores = 8
+)
+
+summary(fit_gdp_mis)
